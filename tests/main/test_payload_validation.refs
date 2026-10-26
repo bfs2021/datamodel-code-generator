@@ -1693,6 +1693,7 @@ openapi/schema_location_alias.yaml::components.schemas.A	payloads/native_numeric
 openapi/schema_location_alias.yaml::components.schemas.B	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/schema_location_alias.yaml::components.schemas.Cat	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/schema_location_alias.yaml::components.schemas.Dog	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
+openapi/self_spelled_external_ref/library.yaml::components.schemas.Page	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/serialize_as_any.yaml::components.schemas.User	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/shadowed_imports.yaml::components.schemas.marketingOptIn	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/shadowed_imports_base_and_fields.yaml::components.schemas.BaseItem	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
@@ -3460,6 +3461,7 @@ openapi/schema_location_alias.yaml::components.schemas.A	payloads/native_numeric
 openapi/schema_location_alias.yaml::components.schemas.B	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/schema_location_alias.yaml::components.schemas.Cat	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/schema_location_alias.yaml::components.schemas.Dog	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
+openapi/self_spelled_external_ref/library.yaml::components.schemas.Page	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/serialize_as_any.yaml::components.schemas.User	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/shadowed_imports.yaml::components.schemas.marketingOptIn	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt
 openapi/shadowed_imports_base_and_fields.yaml::components.schemas.BaseItem	payloads/native_numeric_empty_errors.txt	= main/jsonschema/nested_resources/no_warnings.txt

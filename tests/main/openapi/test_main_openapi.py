@@ -14864,6 +14864,28 @@ def test_main_openapi_api_scope_external_boolean_schema(output_file: Path) -> No
     )
 
 
+def test_main_openapi_self_spelled_external_reference(output_file: Path) -> None:
+    """Resolve a reference spelled with the `$self` of a loaded document to that document, as the `api` scope does."""
+    run_main_and_assert(
+        input_path=OPEN_API_DATA_PATH / "self_spelled_external_ref" / "openapi.yaml",
+        output_path=output_file,
+        input_file_type="openapi",
+        assert_func=assert_file_content,
+        extra_args=[
+            "--openapi-scopes",
+            "schemas",
+            "paths",
+            "parameters",
+            "--output-model-type",
+            "pydantic_v2.BaseModel",
+            "--disable-timestamp",
+            "--formatters",
+            "builtin",
+        ],
+        force_exec_validation=True,
+    )
+
+
 def test_main_openapi_api_scope_path_names_custom_class_name_generator(tmp_path: Path) -> None:
     """Hand the custom class name generator the route-derived API scope names."""
     run_generate_file_and_assert(
