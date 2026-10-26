@@ -13,7 +13,7 @@ state satisfy structurally. ``process_each_module`` runs the passes of each modu
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from itertools import chain, islice
 from typing import TYPE_CHECKING, Any, Final, Literal, NamedTuple, TypeAlias, cast
@@ -234,6 +234,10 @@ class ModulesHost(ConstructorInfoHost, RenamedTypesHost, TypeOverrideHost, Proto
     @property
     def builtin_names(self) -> frozenset[str]:
         """The builtin names of the target Python version."""
+
+    @property
+    def collapse_root_models(self) -> bool:
+        """Whether root models are collapsed into their users."""
 
     @property
     def data_model_type(self) -> type[DataModel]:
@@ -3283,6 +3287,21 @@ def _root_writes_default(wrapper: DataModel) -> bool:
     return call_default or wrapper._field_assignment_facts(root).has_default  # noqa: SLF001
 
 
+def _drop_nested_discriminators_of_root_defaults(parser: ModulesHost, field: DataModelFieldBase) -> None:
+    """Write no ``discriminator=`` for a union inside a field's type that takes a root model with a default.
+
+    ``--collapse-root-models`` writes the discriminator of the root model that a list names as its items onto the
+    union it inlines there, a type of its own that the field's extras do not hold.
+    """
+    for nested in field.data_type.all_data_types:
+        if nested is field.data_type or not nested.discriminator:
+            continue
+        wrappers: list[DataModel] = []
+        deque(_iter_discriminator_data_types(nested.data_types, wrappers=wrappers), maxlen=0)
+        if any(map(_root_writes_default, wrappers)):
+            parser._graph_builder.set_type_discriminator(nested, None)  # noqa: SLF001
+
+
 def settle_discriminated_unions(parser: ModulesHost, run: ModulesRun) -> None:
     """Write no ``discriminator=`` that Pydantic cannot build, once every module has written its tags.
 
@@ -3318,6 +3337,8 @@ def settle_discriminated_unions(parser: ModulesHost, run: ModulesRun) -> None:
                             )
                         ) or any(map(_root_writes_default, wrappers)):
                             parser._graph_builder.drop_field_discriminator(field)  # noqa: SLF001
+                if parser.collapse_root_models:
+                    _drop_nested_discriminators_of_root_defaults(parser, field)
 
 
 def apply_base_stand_in_imports(parser: ModulesHost, run: ModulesRun) -> None:

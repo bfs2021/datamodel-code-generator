@@ -10546,6 +10546,23 @@ ALIAS_DEFAULT_WARNING = pytest.mark.filterwarnings("ignore:.*which has no effect
             ["--force-optional", "--use-type-alias", "--use-annotated"],
             marks=ALIAS_DEFAULT_WARNING,
         ),
+        ("discriminator_collapsed_list_variant_default", "pydantic_v2.BaseModel", ["--collapse-root-models"]),
+        (
+            "discriminator_collapsed_list_variant_default",
+            "pydantic_v2.BaseModel",
+            ["--collapse-root-models", "--force-optional"],
+        ),
+        (
+            "discriminator_collapsed_list_variant_default",
+            "pydantic_v2.BaseModel",
+            ["--collapse-root-models", "--use-annotated"],
+        ),
+        (
+            "discriminator_collapsed_list_variant_default",
+            "pydantic_v2.BaseModel",
+            ["--collapse-root-models", "--force-optional", "--strip-default-none"],
+        ),
+        ("discriminator_collapsed_list_variant_default", "pydantic_v2.dataclass", ["--collapse-root-models"]),
     ],
 )
 def test_main_openapi_discriminator_nested_variant_defaults(
@@ -10557,8 +10574,9 @@ def test_main_openapi_discriminator_nested_variant_defaults(
     schema of the root a ``default`` schema that no tagged union holds. ``--force-optional`` gives a root a default,
     and so does the default of its schema. A root that writes none keeps the discriminator of the union: with
     ``--strip-default-none`` and ``--use-annotated`` for an alias, which writes no assignment, and in a root model
-    written as an alias, which writes no root field. The roots a variant reaches count however deep. The verdicts of
-    each payload are the generated models', and the schema's decides whether the payload is valid.
+    written as an alias, which writes no root field. The roots a variant reaches count however deep, and so do the
+    unions that ``--collapse-root-models`` inlines into the items of a list. The verdicts of each payload are the
+    generated models', and the schema's decides whether the payload is valid.
     """
     run_main_and_assert(
         input_path=OPEN_API_DATA_PATH / f"{input_name}.yaml",
