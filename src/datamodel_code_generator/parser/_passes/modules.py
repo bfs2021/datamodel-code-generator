@@ -128,11 +128,12 @@ from datamodel_code_generator.parser._passes._state import ConfigT, ContextT, Re
 from datamodel_code_generator.parser._passes._warnings import warn_as_parser_base
 from datamodel_code_generator.parser._passes.render_prep import validates_structured_default
 from datamodel_code_generator.python_literal import runtime_expression_imports
-from datamodel_code_generator.reference import _ALIAS_RESOLUTION_CLASS_NAME_KEY, ModelResolver
+from datamodel_code_generator.reference import _ALIAS_RESOLUTION_CLASS_NAME_KEY, SPECIAL_PATH_MARKER, ModelResolver
 from datamodel_code_generator.types import ANY, NONE, DataType, Types
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
+    from collections.abc import Set as AbstractSet
     from pathlib import Path
 
     from datamodel_code_generator._format_types import PythonVersion
@@ -362,7 +363,31 @@ class ReuseHost(RecursionFactsHost, Protocol):
         """Return the keys of one comparison pass of the dedup or reuse user of a row."""
 
 
-class CollapseHost(RecursionFactsHost, ReferenceExpressionHost, RenamedTypesHost, ReplacedRootsHost, Protocol):
+class InlineVariantHost(Protocol):
+    """What deciding which inline variants take the tag they inherit reads of the parser."""
+
+    _inline_variant_models: frozenset[int] | None
+
+    @property
+    def field_name_model_type(self) -> ModelType:
+        """The model type that field names are validated for."""
+
+    @property
+    def model_resolver(self) -> ModelResolver:
+        """The resolver of model and field names."""
+
+    @property
+    def results(self) -> list[DataModel]:
+        """The parsed models."""
+
+    @property
+    def use_enum_values_in_discriminator(self) -> bool:
+        """Whether discriminator tags are written as the members of their enums."""
+
+
+class CollapseHost(
+    InlineVariantHost, RecursionFactsHost, ReferenceExpressionHost, RenamedTypesHost, ReplacedRootsHost, Protocol
+):
     """The options, run state and hooks of the parser that collapsing root models reads and writes."""
 
     @property
@@ -406,28 +431,12 @@ class CollapseHost(RecursionFactsHost, ReferenceExpressionHost, RenamedTypesHost
         """Whether constraints are written as ``Field()`` arguments."""
 
     @property
-    def field_name_model_type(self) -> ModelType:
-        """The model type that field names are validated for."""
-
-    @property
     def generate_schema_validators(self) -> bool:
         """Whether models get the schema validator rules the types cannot express."""
 
     @property
     def generation_store(self) -> GenerationStore:
         """The generation store of the parse."""
-
-    @property
-    def model_resolver(self) -> ModelResolver:
-        """The resolver of model and field names."""
-
-    @property
-    def results(self) -> list[DataModel]:
-        """The parsed models."""
-
-    @property
-    def use_enum_values_in_discriminator(self) -> bool:
-        """Whether discriminator tags are written as the members of their enums."""
 
     def _is_root_model(self, model: DataModel) -> bool:
         """Return whether a model uses the configured root model representation."""
@@ -436,7 +445,7 @@ class CollapseHost(RecursionFactsHost, ReferenceExpressionHost, RenamedTypesHost
         """Return whether collapsing keeps a root model named wherever it is referenced."""
 
 
-class DiscriminatorHost(Protocol):
+class DiscriminatorHost(InlineVariantHost, Protocol):
     """The options, run state and hooks of the parser that writing discriminator tags reads and writes."""
 
     _deferred_tagged_unions: list[_DiscriminatorUnion]
@@ -478,28 +487,12 @@ class DiscriminatorHost(Protocol):
         """The field type of the output."""
 
     @property
-    def field_name_model_type(self) -> ModelType:
-        """The model type that field names are validated for."""
-
-    @property
     def force_optional_for_required_fields(self) -> bool:
         """Whether required fields are made optional."""
 
     @property
-    def model_resolver(self) -> ModelResolver:
-        """The resolver of model and field names."""
-
-    @property
-    def results(self) -> list[DataModel]:
-        """The parsed models."""
-
-    @property
     def tag_msgspec_by_payload_name(self) -> bool:
         """Whether msgspec tag fields are named by their payload names."""
-
-    @property
-    def use_enum_values_in_discriminator(self) -> bool:
-        """Whether discriminator tags are written as the members of their enums."""
 
     @property
     def use_msgspec_tagged_unions(self) -> bool:
@@ -1081,11 +1074,12 @@ def _find_discriminator_value(
     )
 
 
-def _get_discriminator_values(
+def _get_discriminator_values(  # noqa: PLR0913
     discriminator_model: DataModel,
     field_name: str,
     mapping: dict[str, str],
     *,
+    inline_models: AbstractSet[int],
     require_literal: bool = False,
     field_name_mode: TagFieldMatch = "python-or-original-name",
 ) -> list[DiscriminatorValue]:
@@ -1095,6 +1089,7 @@ def _get_discriminator_values(
         discriminator_model,
         field_name,
         mapping,
+        inline_models=inline_models,
         field_name_mode=field_name_mode,
     )
 
@@ -1120,22 +1115,30 @@ def _get_union_discriminator_values(
     field_name: str,
     mapping: dict[str, str],
     *,
+    inline_models: AbstractSet[int],
     field_name_mode: TagFieldMatch,
 ) -> list[DiscriminatorValue]:
     """Return the tags a union selects a variant by: mapping values, the tag of its own schema, else its name."""
-    return _variant_tags("union", discriminator_model, field_name, mapping, field_name_mode=field_name_mode)
+    return _variant_tags(
+        "union", discriminator_model, field_name, mapping, inline_models=inline_models, field_name_mode=field_name_mode
+    )
 
 
-def _variant_tags(
+def _variant_tags(  # noqa: PLR0913
     source: VariantTagSource,
     discriminator_model: DataModel,
     field_name: str,
     mapping: dict[str, str],
     *,
+    inline_models: AbstractSet[int],
     field_name_mode: TagFieldMatch,
 ) -> list[DiscriminatorValue]:
     """Return the tags of a variant (``variant_tags``) from its tag fields, the mapping and its schema path."""
-    return [*variant_tags(source, _VariantTagFacts(discriminator_model, field_name, mapping, field_name_mode)).values]
+    return [
+        *variant_tags(
+            source, _VariantTagFacts(discriminator_model, field_name, mapping, field_name_mode, inline_models)
+        ).values
+    ]
 
 
 @final
@@ -1147,6 +1150,7 @@ class _VariantTagFacts:
     field_name: str
     mapping: dict[str, str]
     field_name_mode: TagFieldMatch
+    inline_models: AbstractSet[int]
 
     def own_tag(self) -> DiscriminatorValue | None:
         """Return the tag of the variant's own tag field."""
@@ -1161,6 +1165,12 @@ class _VariantTagFacts:
         return _find_discriminator_value(
             self.model.iter_all_fields(), self.field_name, field_name_mode=self.field_name_mode
         )
+
+    def inline_tag(self) -> DiscriminatorValue | None:
+        """Return the tag an inline variant inherits, where ``inline_variant_models`` lets it take it."""
+        if id(self.model) not in self.inline_models or SPECIAL_PATH_MARKER not in self.path_segment():
+            return None
+        return self.inherited_tag()
 
     def mapped_tags(self) -> list[str]:
         """Return the mapping keys naming the variant or its bases."""
@@ -1453,11 +1463,12 @@ def _written_enum_member_keys(
     return [*keys, *values_of_members] if tags.rule == "all-members" else keys
 
 
-def _discriminator_variants_are_valid(
+def _discriminator_variants_are_valid(  # noqa: PLR0913
     data_types: Iterable[DataType],
     field_name: str,
     mapping: dict[str, str],
     *,
+    inline_models: AbstractSet[int],
     original_name: str | None = None,
     enum_member_tags: bool = False,
 ) -> bool:
@@ -1479,6 +1490,7 @@ def _discriminator_variants_are_valid(
             discriminator_model,
             original_name if original_name is not None else field_name,
             mapping,
+            inline_models=inline_models,
             require_literal=not can_update_discriminator,
             field_name_mode="source-name" if original_name is not None else "python-or-original-name",
         )
@@ -1516,6 +1528,55 @@ def _discriminator_variants_are_valid(
                 return False
             discriminator_value_owners[key] = owner
     return True
+
+
+def inline_variant_models(parser: InlineVariantHost) -> frozenset[int]:
+    """Return the ids of the inline variants that may take the tag they inherit, decided once from every union.
+
+    An inline variant has no name to be tagged by, so its schema path ends in an internal marker, which no payload
+    carries. It takes the tag it inherits (``variant_tags``) unless a union that lists it would then list two variants
+    with one tag, which turns that union into a plain union and takes the tags from its named variants. Every
+    variant of such a union keeps the marker, and so does a variant that another union lists. The decision reads the
+    unions before any of them writes a tag, as a variant takes its tag from the first union that writes one.
+    """
+    if (decided := parser._inline_variant_models) is not None:  # noqa: SLF001
+        return decided
+    inline: set[int] = set()
+    clashing: set[int] = set()
+    for model in parser.results:
+        for field in model.fields:
+            match field.extras.get("discriminator"):
+                case {"propertyName": str() as property_name} as discriminator if property_name:
+                    pass
+                case _:
+                    continue
+            variants = {
+                id(source)
+                for data_type, _, _ in _iter_discriminator_data_types(field.data_type.data_types)
+                if data_type.reference
+                and isinstance(source := data_type.reference.source, DataModel)
+                and SPECIAL_PATH_MARKER in _get_schema_path(source).rpartition("/")[2]
+            }
+            if not variants:
+                continue
+            field_name, _ = parser.model_resolver.get_valid_field_name_and_alias(
+                field_name=property_name, model_type=parser.field_name_model_type
+            )
+            inline |= variants
+            if [
+                _discriminator_variants_are_valid(
+                    field.data_type.data_types,
+                    field_name,
+                    discriminator.get("mapping", {}),
+                    inline_models=models,
+                    original_name=property_name if field.SUPPORTS_DISCRIMINATOR else None,
+                    enum_member_tags=parser.use_enum_values_in_discriminator,
+                )
+                for models in (frozenset(), variants)
+            ] == [True, False]:
+                clashing |= variants
+    parser._inline_variant_models = decided = frozenset(inline - clashing)  # noqa: SLF001
+    return decided
 
 
 def _get_single_discriminator_default(
@@ -1947,6 +2008,7 @@ def collapse_root_models_in_scope(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, 
                                 copied_data_type.data_types,
                                 field_name,
                                 mapping,
+                                inline_models=inline_variant_models(parser),
                                 enum_member_tags=parser.use_enum_values_in_discriminator,
                             ):
                                 graph_builder.set_type_discriminator(copied_data_type, field_name)
@@ -2299,6 +2361,7 @@ def apply_discriminator_type(  # noqa: PLR0912, PLR0914, PLR0915
                     pass
                 case _:
                     continue
+            inline_models = inline_variant_models(parser)
             field_name, alias = parser.model_resolver.get_valid_field_name_and_alias(
                 field_name=property_name, model_type=parser.field_name_model_type
             )
@@ -2314,6 +2377,7 @@ def apply_discriminator_type(  # noqa: PLR0912, PLR0914, PLR0915
                 field.data_type.data_types,
                 field_name,
                 mapping,
+                inline_models=inline_models,
                 original_name=property_name if field.SUPPORTS_DISCRIMINATOR else None,
                 enum_member_tags=parser.use_enum_values_in_discriminator,
             ):
@@ -2382,6 +2446,7 @@ def apply_discriminator_type(  # noqa: PLR0912, PLR0914, PLR0915
                     discriminator_model,
                     field_name,
                     mapping,
+                    inline_models=inline_models,
                     require_literal=index is None,
                     field_name_mode=field_name_mode,
                 )
@@ -2394,6 +2459,7 @@ def apply_discriminator_type(  # noqa: PLR0912, PLR0914, PLR0915
                         field_name=field_name,
                         mapping=mapping,
                         values=discriminator_values,
+                        inline_models=inline_models,
                         field_name_mode=field_name_mode,
                     )
                     for collapsed_name, collapsed_types, collapsed_mapping in (
@@ -2409,6 +2475,7 @@ def apply_discriminator_type(  # noqa: PLR0912, PLR0914, PLR0915
                             field_name=field_name,
                             mapping=collapsed_mapping,
                             values=discriminator_values,
+                            inline_models=inline_models,
                             field_name_mode=field_name_mode,
                         )
                 has_one_literal = False
@@ -2599,6 +2666,7 @@ def record_variant_discriminator_tags(  # noqa: PLR0913
     field_name: str,
     mapping: dict[str, str],
     values: list[DiscriminatorValue],
+    inline_models: AbstractSet[int],
     field_name_mode: TagFieldMatch,
 ) -> None:
     """Remember the tags unions map a variant to, unless the variant declares its own tag.
@@ -2616,7 +2684,9 @@ def record_variant_discriminator_tags(  # noqa: PLR0913
                 if not same_tags(tags, values, "legacy-python-equality")
             }
         elif not same_tags(
-            tags := _get_union_discriminator_values(variant, field_name, mapping, field_name_mode=field_name_mode),
+            tags := _get_union_discriminator_values(
+                variant, field_name, mapping, inline_models=inline_models, field_name_mode=field_name_mode
+            ),
             values,
             "legacy-python-equality",
         ):
@@ -2679,6 +2749,7 @@ def record_collapsed_variant_tags(  # noqa: PLR0913
     field_name: str,
     mapping: dict[str, str],
     values: list[DiscriminatorValue],
+    inline_models: AbstractSet[int],
     field_name_mode: TagFieldMatch,
 ) -> None:
     """Remember the tags a union maps a variant to when collapsed reuse replaced the model the union names.
@@ -2691,7 +2762,9 @@ def record_collapsed_variant_tags(  # noqa: PLR0913
         return
     key = (id(variant), property_name)
     if not same_tags(
-        tags := _get_discriminator_values(removed, field_name, mapping, field_name_mode=field_name_mode),
+        tags := _get_discriminator_values(
+            removed, field_name, mapping, inline_models=inline_models, field_name_mode=field_name_mode
+        ),
         values,
         "legacy-python-equality",
     ):

@@ -10396,6 +10396,86 @@ def test_main_openapi_discriminator_lone_variant_tags(
     assert_output("".join(verdicts), name="payloads")
 
 
+@pytest.mark.parametrize(
+    ("output_model", "extra_args", "model_names"),
+    [
+        ("pydantic_v2.BaseModel", [], None),
+        ("pydantic_v2.BaseModel", ["--reuse-model"], None),
+        ("pydantic_v2.BaseModel", ["--collapse-root-models"], None),
+        ("pydantic_v2.BaseModel", ["--use-enum-values-in-discriminator"], None),
+        ("pydantic_v2.dataclass", [], None),
+        pytest.param(
+            "msgspec.Struct",
+            ["--use-msgspec-tagged-unions"],
+            ["LiveEvent"],
+            marks=pytest.mark.filterwarnings("ignore:.*cannot be represented as msgspec tags.*"),
+        ),
+    ],
+)
+def test_main_openapi_discriminator_inline_variants(
+    output_model: str, extra_args: list[str], model_names: list[str] | None, output_file: Path
+) -> None:
+    """Tag a variant that is an inline ``allOf`` schema by the tag it inherits instead of an internal path marker.
+
+    Up to 0.86.0 such a variant, and a variant that a component of one discriminated union splits off, had a path
+    segment as its tag (``Literal['0#-datamodel-code-generator-#-allOf-#-special-#']``), which no payload carries.
+    A variant that the same union lists beside another with the same tag, in any union that lists it, keeps the
+    marker, as the union would else not be discriminated any more. The verdicts of each payload are the generated
+    models', and the schema's decides whether the payload is valid.
+    """
+    input_name = "discriminator_inline_variants"
+    run_main_and_assert(
+        input_path=OPEN_API_DATA_PATH / f"{input_name}.yaml",
+        output_path=output_file,
+        input_file_type="openapi",
+        extra_args=[
+            "--target-python-version",
+            "3.10",
+            "--formatters",
+            "builtin",
+            "--output-model-type",
+            output_model,
+            *extra_args,
+        ],
+        force_exec_validation=True,
+    )
+    document = yaml.safe_load((OPEN_API_DATA_PATH / f"{input_name}.yaml").read_text(encoding="utf-8"))
+
+    def schema_decides(validator: Draft202012Validator, kind: str, payload: object) -> None:
+        if kind == "valid":
+            validator.validate(payload)
+        else:
+            with pytest.raises(SchemaValidationError):
+                validator.validate(payload)
+
+    verdicts = []
+    for model_name, cases in json.loads((DATA_PATH / "payloads" / f"{input_name}.json").read_text()).items():
+        if model_names is not None and model_name not in model_names:
+            continue
+        validator = Draft202012Validator({**document, "$ref": f"#/components/schemas/{model_name}"})
+        with _generated_model(output_file, input_name, model_name) as model:
+            if output_model == "msgspec.Struct":
+                import msgspec
+
+                def validate(text: str, model: Any = model) -> Any:
+                    return msgspec.json.decode(text, type=model)
+
+                rejection: type[Exception] = msgspec.ValidationError
+            else:
+                validate = _model_json_validator(model)
+                rejection = pydantic.ValidationError
+            for kind, payload in ((kind, payload) for kind, payloads in cases.items() for payload in payloads):
+                schema_decides(validator, kind, payload)
+                try:
+                    validate(json.dumps(payload))
+                except rejection:
+                    verdict = "rejected"
+                else:
+                    verdict = "accepted"
+                verdicts.append(f"{model_name} {kind} {json.dumps(payload)}: {verdict}\n")
+    assert_output("".join(verdicts), name="payloads")
+
+
 ALIAS_DEFAULT_WARNING = pytest.mark.filterwarnings("ignore:.*which has no effect.*")
 """Pydantic warns where a type alias writes the default of its root inside ``Annotated`` and a union takes the alias."""
 

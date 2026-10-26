@@ -196,6 +196,7 @@ openapi/discriminator_in_array_anyof.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_in_array_oneof.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_in_array_snake_case.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_in_array_underscore.yaml	yaml_fast_constructor/parity.txt
+openapi/discriminator_inline_variants.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_integer_mapping.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_integer_no_mapping.yaml	yaml_fast_constructor/parity.txt
 openapi/discriminator_lone_variant_tags.yaml	yaml_fast_constructor/parity.txt

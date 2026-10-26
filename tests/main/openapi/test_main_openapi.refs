@@ -1010,6 +1010,19 @@ oneOf-None-None-in_array.py	main/openapi/discriminator/in_array.py
 [test_main_openapi_discriminator_inherited_msgspec_untagged]
 api	main/openapi/discriminator/inherited_msgspec_untagged.py
 cli	main/openapi/discriminator/inherited_msgspec_untagged.py
+[test_main_openapi_discriminator_inline_variants]
+msgspec.Struct-extra_args5-model_names5	main/openapi/main_openapi/discriminator_inline_variants[msgspec.Struct-extra_args5-model_names5].payloads.txt
+msgspec.Struct-extra_args5-model_names5	main/openapi/main_openapi/discriminator_inline_variants[msgspec.Struct-extra_args5-model_names5].py
+pydantic_v2.BaseModel-extra_args0-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].payloads.txt
+pydantic_v2.BaseModel-extra_args0-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].py
+pydantic_v2.BaseModel-extra_args1-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args1-None].payloads.txt	= main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].payloads.txt
+pydantic_v2.BaseModel-extra_args1-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args1-None].py
+pydantic_v2.BaseModel-extra_args2-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args2-None].payloads.txt	= main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].payloads.txt
+pydantic_v2.BaseModel-extra_args2-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args2-None].py	= main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].py
+pydantic_v2.BaseModel-extra_args3-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args3-None].payloads.txt
+pydantic_v2.BaseModel-extra_args3-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args3-None].py
+pydantic_v2.dataclass-extra_args4-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.dataclass-extra_args4-None].payloads.txt	= main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.BaseModel-extra_args0-None].payloads.txt
+pydantic_v2.dataclass-extra_args4-None	main/openapi/main_openapi/discriminator_inline_variants[pydantic_v2.dataclass-extra_args4-None].py
 [test_main_openapi_discriminator_integer_mapping]
 	main/openapi/discriminator/integer_mapping.py
 [test_main_openapi_discriminator_integer_mapping_use_enum]
