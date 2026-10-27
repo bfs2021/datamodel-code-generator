@@ -1770,7 +1770,9 @@ class DataModelField(DataModelFieldBase):
                 )
             ):
                 if self.data_type.is_union:
-                    if not isinstance(self.default, (dict, list)):
+                    if not isinstance(self.default, (dict, list)) or (
+                        isinstance(self.default, list) and not data_type.is_list
+                    ):
                         continue
                     if isinstance(self.default, dict) and any(dt.is_dict for dt in self.data_type.data_types):
                         continue
